@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Реєстрація та Вхід</title>
+    <link rel="stylesheet" href="register.css">
+    <link rel="shortcut icon" href="src/favicon-512x512.png" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <!-- Форма входу -->
+        <div class="login-form">
+            <h1>Вхід</h1>
+            <input id="login-username" type="text" placeholder="Логін">
+            <input id="login-password" type="password" placeholder="Пароль">
+            <p class="alert" id="alert"></p>
+            <button onclick="login()">Увійти</button>
+            <p id="reg-btn">Немає акаунту? Зареєструйтесь</p>
+        </div>
+
+        <!-- Форма реєстрації -->
+        <div class="register-form">
+            <h1>Реєстрація</h1>
+            <input id="register-username" type="text" placeholder="Логін">
+            <input id="register-password" type="password" placeholder="Пароль">
+            <input id="register-confirm-password" type="password" placeholder="Повторіть пароль">
+            <p class="alert" id="alert"></p>
+            <button onclick="register()">Зареєструватися</button>
+            <p id="login-btn">Є акаунт? Увійдіть</p>
+        </div>
+    </div>
+
+    <script src="register.js"></script>
+</body>
+</html>
