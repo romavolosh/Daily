@@ -10,20 +10,60 @@ require('dotenv').config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+// Enhanced CORS configuration
+const corsOptions = {
+    origin: function(origin, callback) {
+        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['https://ficedaily.online'];
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    credentials: true,
+    maxAge: 86400
+};
 
-// MongoDB підключення
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    dbName: 'Dayli'
-}).then(() => {
-    console.log('✅ Connected to MongoDB Atlas');
-}).catch((error) => {
-    console.error('❌ MongoDB connection error:', error);
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.static('public', { maxAge: '1d' }));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
 });
+
+// Request logging for development
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+        console.log(`${req.method} ${req.url}`);
+        next();
+    });
+}
+
+// MongoDB connection with retry logic
+async function connectDB() {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            dbName: 'Dayli',
+            serverSelectionTimeoutMS: 5000,
+            retryWrites: true
+        });
+        console.log('✅ Connected to MongoDB Atlas');
+    } catch (error) {
+        console.error('❌ MongoDB connection error:', error);
+        setTimeout(connectDB, 5000);
+    }
+}
+
+connectDB();
 
 // Главная страница
 app.get('/', (req, res) => {
@@ -152,14 +192,45 @@ app.patch('/api/tasks/:id/toggle', async (req, res) => {
     }
 });
 
-// Error handling middleware
+// Enhanced error handling
 app.use((err, req, res, next) => {
     console.error('Error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    
+    if (err.name === 'CastError') {
+        return res.status(400).json({ 
+            status: 'error',
+            message: 'Invalid data format'
+        });
+    }
+    
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+    
+    res.status(err.status || 500).json({
+        status: 'error',
+        message: process.env.NODE_ENV === 'production' 
+            ? 'Something went wrong!' 
+            : err.message
+    });
 });
 
-// Запуск сервера
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully');
+    app.close(() => {
+        mongoose.connection.close(false, () => {
+            console.log('💤 Process terminated!');
+            process.exit(0);
+        });
+    });
 });
